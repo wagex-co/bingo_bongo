@@ -84,6 +84,9 @@ class Scoreboard:
         except Exception as e:
             print(f"An error occurred: {e}")
 
+    def __repr__(self) -> str:
+        return f"Scoreboard(games={self.games})"
+
     def _fetch_data(self, url: str) -> dict:
         response = requests.get(url)
         return response.json()
@@ -154,5 +157,18 @@ class Scoreboard:
             if (game.home_team.full_name == home_team and game.away_team.full_name == away_team):
                 return {f"{home_team}vs{away_team}": process_ml(game.home_ml, game.away_ml)}
             elif (game.home_team.full_name == away_team and game.away_team.full_name == home_team):
-                return {f"{away_team}vs{home_team}": process_ml(game.away_ml, game.home_ml)}  # Note: ML odds are swapped here
+                return {f"{away_team}vs{home_team}": process_ml(game.away_ml, game.home_ml)}  
+        return {}
+    
+    def get_scores(self, home_team: Optional[str] = None, away_team: Optional[str] = None):
+        """
+        Only works post game I think? DOesn't seem to be returning scores during game for soccer... Maybe it works for other sports?
+        """
+        if not home_team and not away_team:
+            return {f"{game.home_team.full_name}vs{game.away_team.full_name}": (game.home_score, game.away_score) for game in self.games}
+        for game in self.games:
+            if (game.home_team.full_name == home_team and game.away_team.full_name == away_team):
+                return {f"{home_team}vs{away_team}": (game.home_score, game.away_score)}
+            elif (game.home_team.full_name == away_team and game.away_team.full_name == home_team):
+                return {f"{away_team}vs{home_team}": (game.away_score, game.home_score)}
         return {}
