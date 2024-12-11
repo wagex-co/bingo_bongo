@@ -7,7 +7,9 @@ sport_dict = {"NBA": "nba-basketball",
               "NFL": "nfl-football",
               "NHL": "nhl-hockey",
               "MLB": "mlb-baseball",
-              "NCAAB": "ncaa-basketball"}
+              "NCAAB": "ncaa-basketball",
+              "EPL": "english-premier-league",
+              "UCL": "champions-league"}
 
 class Scoreboard:
     def __init__(self, sport='NBA', date="", current_line=True):
@@ -96,3 +98,33 @@ class Scoreboard:
                     game['away_ml'][line['sportsbook']] = line[_line]['awayOdds']
             games.append(game)
         self.games = games
+    
+    def get_totals(self, home_team=None, away_team=None):
+        """
+        Get totals for a specific game by team names, or all games if no teams specified
+        Returns a dictionary with format {'TeamAvsTeamB': total_value}
+        where total_value is the first half-point total found, or rounded nearest half
+        """
+        def process_total(totals_dict):
+            if not totals_dict:
+                return None
+            # First try to find a value that ends in .5
+            for total in totals_dict.values():
+                if total and total % 1 == 0.5:
+                    return total
+            # If no .5 found, take the first valid number and round to nearest .5
+            for total in totals_dict.values():
+                if total:
+                    return round(total * 2) / 2
+            return None
+
+        if home_team is None and away_team is None:
+            return {f"{game['home_team']}vs{game['away_team']}": process_total(game['total']) 
+                    for game in self.games}
+        
+        for game in self.games:
+            if (game['home_team'] == home_team and game['away_team'] == away_team):
+                return {f"{home_team}vs{away_team}": process_total(game['total'])}
+            elif (game['home_team'] == away_team and game['away_team'] == home_team):
+                return {f"{away_team}vs{home_team}": process_total(game['total'])}
+        return {}
