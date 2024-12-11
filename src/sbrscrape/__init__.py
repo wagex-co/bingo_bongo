@@ -4,6 +4,8 @@ from typing import Dict, List, Optional
 import requests
 import re
 import json
+import random
+import time
 
 SPORT_DICT = {
     "NBA": "nba-basketball",
@@ -77,10 +79,14 @@ class Game:
         )
 
 class Scoreboard:
-    def __init__(self, sport='NBA', date="", current_line=True):
+    def __init__(self, sport='NBA', date="", current_line=True, delay=False):
         self.games: List[Game] = []
+        self.date = date
+        self.delay = delay
+        self.current_line = current_line
+        self.sport = sport
         try:
-            self.scrape_games(sport, date, current_line)
+            self.scrape_games()
         except Exception as e:
             print(f"An error occurred: {e}")
 
@@ -88,7 +94,37 @@ class Scoreboard:
         return f"Scoreboard(games={self.games})"
 
     def _fetch_data(self, url: str) -> dict:
-        response = requests.get(url)
+        # List of common user agents
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+        ]
+        
+        headers = {
+            'User-Agent': random.choice(user_agents),
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Cache-Control': 'max-age=0',
+        }
+        
+        # Randomized delay between 1-4 seconds with some microsecond variation
+        # time.sleep(random.uniform(1.0, 4.0))
+        
+        response = requests.get(url, headers=headers)
+        if response.status_code != 200:
+            time.sleep(random.uniform(2.0, 5.0))  # Additional delay on failure
+            response = requests.get(url, headers=headers)  # One retry
+        
         return response.json()
 
     def _process_game_rows(self, json_data: dict) -> Dict[str, dict]:
@@ -97,18 +133,18 @@ class Scoreboard:
             game_list.extend(item['oddsTableModel']['gameRows'])
         return {g['gameView']['gameId']: g for g in game_list}
 
-    def scrape_games(self, sport="NBA", date="", current_line=True):
-        date = date or datetime.today().strftime("%Y-%m-%d")
-        line_type = 'currentLine' if current_line else 'openingLine'
+    def scrape_games(self):
+        date = self.date or datetime.today().strftime("%Y-%m-%d")
+        line_type = 'currentLine' if self.current_line else 'openingLine'
 
-        initial_url = f"https://www.sportsbookreview.com/betting-odds/{SPORT_DICT[sport]}/?date={date}"
+        initial_url = f"https://www.sportsbookreview.com/betting-odds/{SPORT_DICT[self.sport]}/?date={date}"
         build_id = json.loads(re.findall('__NEXT_DATA__" type="application/json">(.*?)</script>', 
                                        requests.get(initial_url).text)[0])['buildId']
 
-        base_url = f"https://www.sportsbookreview.com/_next/data/{build_id}/betting-odds/{SPORT_DICT[sport]}"
-        spreads = self._process_game_rows(self._fetch_data(f"{base_url}.json?league={SPORT_DICT[sport]}&date={date}"))
-        moneylines = self._process_game_rows(self._fetch_data(f"{base_url}/money-line/full-game.json?league={SPORT_DICT[sport]}&oddsType=money-line&oddsScope=full-game&date={date}"))
-        totals = self._process_game_rows(self._fetch_data(f"{base_url}/totals/full-game.json?league={SPORT_DICT[sport]}&oddsType=totals&oddsScope=full-game&date={date}"))
+        base_url = f"https://www.sportsbookreview.com/_next/data/{build_id}/betting-odds/{SPORT_DICT[self.sport]}"
+        spreads = self._process_game_rows(self._fetch_data(f"{base_url}.json?league={SPORT_DICT[self.sport]}&date={date}"))
+        moneylines = self._process_game_rows(self._fetch_data(f"{base_url}/money-line/full-game.json?league={SPORT_DICT[self.sport]}&oddsType=money-line&oddsScope=full-game&date={date}"))
+        totals = self._process_game_rows(self._fetch_data(f"{base_url}/totals/full-game.json?league={SPORT_DICT[self.sport]}&oddsType=totals&oddsScope=full-game&date={date}"))
 
         all_stats = {
             game_id: {'spreads': spreads[game_id], 'moneylines': moneylines[game_id], 'totals': totals[game_id]}
