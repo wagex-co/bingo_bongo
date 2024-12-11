@@ -136,3 +136,23 @@ class Scoreboard:
             elif (game.home_team.full_name == away_team and game.away_team.full_name == home_team):
                 return {f"{away_team}vs{home_team}": process_total(game.total)}
         return {}
+
+    def get_ml(self, home_team: Optional[str] = None, away_team: Optional[str] = None) -> Dict[str, Dict[str, int]]:
+        def process_ml(home_ml: Dict[str, int], away_ml: Dict[str, int]) -> Dict[str, int]:
+            if not home_ml or not away_ml:
+                return {}
+            return {
+                'home': next((odds for odds in home_ml.values() if odds), None),
+                'away': next((odds for odds in away_ml.values() if odds), None)
+            }
+
+        if not home_team and not away_team:
+            return {f"{game.home_team.full_name}vs{game.away_team.full_name}": process_ml(game.home_ml, game.away_ml) 
+                    for game in self.games}
+
+        for game in self.games:
+            if (game.home_team.full_name == home_team and game.away_team.full_name == away_team):
+                return {f"{home_team}vs{away_team}": process_ml(game.home_ml, game.away_ml)}
+            elif (game.home_team.full_name == away_team and game.away_team.full_name == home_team):
+                return {f"{away_team}vs{home_team}": process_ml(game.away_ml, game.home_ml)}  # Note: ML odds are swapped here
+        return {}
